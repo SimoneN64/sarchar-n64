@@ -862,7 +862,9 @@ impl Addressable for Rsp {
         }
     }
 
-    fn write_block(&mut self, offset: usize, block: &[u32]) -> Result<WriteReturnSignal, ReadWriteFault> {
+    fn write_block(&mut self, offset: usize, block: &[u32], length: u32) -> Result<WriteReturnSignal, ReadWriteFault> {
+        if (block.len() * 4) as u32 != length { todo!(); }
+
         // wrap offset into local memory
         let mut offset = offset & 0x1FF8;
 
@@ -1715,6 +1717,13 @@ impl RspCpuCore {
                         if (val & 0x40) != 0 {
                             warn!(target: "RSP", "Single step mode enabled");
                             val &= !0x40;
+                        }
+
+                        // SET_INTR
+                        if (val & 0x10) != 0 {
+                            self.comms.mi_interrupts_tx.as_ref().unwrap().send(InterruptUpdate(IMask_SP, InterruptUpdateMode::SetInterrupt)).unwrap();
+                            self.comms.break_cpu();
+                            val &= !0x10;
                         }
 
                         if (val & 0x1FF) != 0 { // TODO

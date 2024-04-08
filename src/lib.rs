@@ -84,7 +84,8 @@ pub trait Addressable {
         todo!("read_block not implemented for address offset ${offset:08X}");
     }
 
-    fn write_block(&mut self, offset: usize, _block: &[u32]) -> Result<WriteReturnSignal, ReadWriteFault> {
+    // need a length because we may write less than a multiple of 4
+    fn write_block(&mut self, offset: usize, _block: &[u32], _length: u32) -> Result<WriteReturnSignal, ReadWriteFault> {
         todo!("write_block not implemented for address offset ${offset:08X}");
     }
 }
@@ -135,18 +136,26 @@ impl<T: Addressable> Addressable for LockedAddressable<T> {
         self.addressable.lock().unwrap().read_block(offset, length)
     }
 
-    fn write_block(&mut self, offset: usize, block: &[u32]) -> Result<WriteReturnSignal, ReadWriteFault> {
-        self.addressable.lock().unwrap().write_block(offset, block)
+    fn write_block(&mut self, offset: usize, block: &[u32], length: u32) -> Result<WriteReturnSignal, ReadWriteFault> {
+        self.addressable.lock().unwrap().write_block(offset, block, length)
     }
 
 }
 
+// Tweakables -- things developers and nerds might want to play with
 #[derive(Debug, Clone, Copy, Default)]
-pub struct EmulationFlags {
+pub struct Tweakables {
     pub disable_textures: bool,
     pub disable_lighting: bool,
-    pub view_texture_map: u32,
-    pub view_texture_index: u32,
+    pub disable_fog     : bool,
+    //shift fog by viewport
+    //pub decal_shift     : f32,
+    //pub decal_times_w   : bool,
+}
+
+// Settings -- normal things people may want to configure (like antialiasing, audio playback rate, etc.)
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Settings {
 }
 
 // Collection of thread-safe channels for the front end to communicate with the emulating system
@@ -184,7 +193,10 @@ pub struct SystemCommunication {
     pub controllers: Arc<RwLock<Vec<ControllerState>>>,
 
     // emulation flags that change the way emulation behaves
-    pub emulation_flags: Arc<RwLock<EmulationFlags>>,
+    pub settings: Arc<RwLock<Settings>>,
+
+    // tweakables -- fun for geeks
+    pub tweakables: Arc<RwLock<Tweakables>>,
 }
 
 impl SystemCommunication {
@@ -202,7 +214,8 @@ impl SystemCommunication {
             start_dma_tx      : None,
             rdram             : Arc::new(RwLock::new(None)),
             controllers       : Arc::new(RwLock::new(vec![ControllerState::default(); 4])),
-            emulation_flags   : Arc::new(RwLock::new(EmulationFlags::default())),
+            settings          : Arc::new(RwLock::new(Settings::default())),
+            tweakables        : Arc::new(RwLock::new(Tweakables::default())),
         }
     }
 
